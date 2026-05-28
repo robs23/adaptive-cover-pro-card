@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { en } from '../src/lib/i18n/en';
 import { fr } from '../src/lib/i18n/fr';
+import { pl } from '../src/lib/i18n/pl';
 import { resolveLocale, t } from '../src/lib/i18n';
 
 describe('resolveLocale', () => {
@@ -25,6 +26,14 @@ describe('resolveLocale', () => {
     expect(resolveLocale({ locale: { language: 'FR-ca' } })).toBe('fr');
   });
 
+  it('returns pl for Polish locale codes', () => {
+    expect(resolveLocale({ locale: { language: 'pl' } })).toBe('pl');
+  });
+
+  it('strips the region tag from Polish BCP-47 codes', () => {
+    expect(resolveLocale({ locale: { language: 'pl-PL' } })).toBe('pl');
+  });
+
   it('falls back to "en" for an unknown locale', () => {
     expect(resolveLocale({ locale: { language: 'de' } })).toBe('en');
   });
@@ -35,7 +44,7 @@ describe('resolveLocale', () => {
 });
 
 describe('t', () => {
-  it('returns the key when neither EN nor FR table has the entry', () => {
+  it('returns the key when no locale table has the entry', () => {
     expect(t('does.not.exist', undefined)).toBe('does.not.exist');
   });
 
@@ -47,6 +56,10 @@ describe('t', () => {
     expect(t('handler.solar', { locale: { language: 'fr' } })).toBe('Suivi solaire');
   });
 
+  it('returns the PL table value for pl locale', () => {
+    expect(t('handler.solar', { locale: { language: 'pl' } })).toBe('Śledzenie słońca');
+  });
+
   it('returns the key name when neither table has the entry for fr locale', () => {
     expect(t('handler.unknown_handler', { locale: { language: 'fr' } })).toBe(
       'handler.unknown_handler',
@@ -55,6 +68,12 @@ describe('t', () => {
 
   it('interpolates a string parameter', () => {
     expect(t('overrides.ends_in', undefined, { time: '5m' })).toBe('ends in 5m');
+  });
+
+  it('interpolates a string parameter in Polish', () => {
+    expect(t('overrides.ends_in', { locale: { language: 'pl' } }, { time: '5m' })).toBe(
+      'kończy się za 5m',
+    );
   });
 
   it('leaves placeholders intact when no params are passed', () => {
@@ -71,14 +90,18 @@ describe('t', () => {
 });
 
 describe('locale-table parity', () => {
-  // Compile-time parity comes from `const fr: typeof en = {...}` in fr.ts. Runtime check is defense-in-depth.
+  const flat = (o: unknown, prefix = ''): string[] =>
+    typeof o === 'object' && o !== null && !Array.isArray(o)
+      ? Object.entries(o as Record<string, unknown>).flatMap(([k, v]) =>
+          flat(v, prefix ? `${prefix}.${k}` : k),
+        )
+      : [prefix];
+
   it('FR has exactly the same key paths as EN', () => {
-    const flat = (o: unknown, prefix = ''): string[] =>
-      typeof o === 'object' && o !== null && !Array.isArray(o)
-        ? Object.entries(o as Record<string, unknown>).flatMap(([k, v]) =>
-            flat(v, prefix ? `${prefix}.${k}` : k),
-          )
-        : [prefix];
     expect(flat(fr).sort()).toEqual(flat(en).sort());
+  });
+
+  it('PL has exactly the same key paths as EN', () => {
+    expect(flat(pl).sort()).toEqual(flat(en).sort());
   });
 });
